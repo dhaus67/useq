@@ -135,7 +135,7 @@ func preOrderFiltered(inspector *inspector.Inspector, filter func(*ast.File) boo
 	var skip bool
 	inspector.Preorder(types, func(n ast.Node) {
 		if f, ok := n.(*ast.File); ok {
-			skip = !filter(f)
+			skip = filter(f)
 			// Store the result, but skip the file since we do not evaluate files, only call expressions.
 			return
 		}
