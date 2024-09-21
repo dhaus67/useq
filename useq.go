@@ -33,6 +33,10 @@ var (
 	}
 )
 
+func init() {
+	register.Plugin("useq", New)
+}
+
 func New(settings any) (register.LinterPlugin, error) {
 	s, err := register.DecodeSettings[Settings](settings)
 	if err != nil {
