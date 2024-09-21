@@ -9,11 +9,11 @@ import (
 )
 
 func main() {
-	useqAnalyzer, err := useq.New(useq.Settings{})
+	analyzer, err := useq.NewAnalyzer(useq.Settings{})
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	singlechecker.Main(useqAnalyzer.Analyzer)
+	singlechecker.Main(analyzer)
 }

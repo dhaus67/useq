@@ -9,10 +9,10 @@ import (
 func TestAnalyzer(t *testing.T) {
 	testdata := analysistest.TestData()
 
-	analyzer, err := New(Settings{})
+	analyzer, err := NewAnalyzer(Settings{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	analysistest.Run(t, testdata, analyzer.Analyzer, "test")
+	analysistest.Run(t, testdata, analyzer, "test")
 }

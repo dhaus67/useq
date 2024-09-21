@@ -15,8 +15,10 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 )
 
+type functionsPerPackage map[string][]string
+
 var (
-	defaultFunctionsPerPackage = map[string][]string{
+	defaultFunctionsPerPackage = functionsPerPackage{
 		"fmt": {
 			"Printf",
 			"Sprintf",
@@ -30,32 +32,19 @@ var (
 	}
 )
 
-// New will create a new instance of the UseqAnalyzer.
-func New(settings Settings) (*UseqAnalyzer, error) {
+// NewAnalyzer creates a new analyzer with the given settings.
+func NewAnalyzer(settings Settings) (*analysis.Analyzer, error) {
 	u := &UseqAnalyzer{settings: settings}
 	u.Analyzer = &analysis.Analyzer{
 		Name:     "useq",
 		Doc:      "useq checks for preferring %q over %s as formatting argument when quotation is needed.",
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
-		Run:      u.run,
+		Run:      u.runAnalyzer,
 	}
 	if err := u.Compile(); err != nil {
 		return nil, err
 	}
-	return u, nil
-}
-
-// NewWithoutCompile will create a new instance of the UseqAnalyzer without compiling the settings.
-// Note: the settings should be compiled before running the linter plugin.
-func NewWithoutCompile(settings Settings) *UseqAnalyzer {
-	u := &UseqAnalyzer{settings: settings}
-	u.Analyzer = &analysis.Analyzer{
-		Name:     "useq",
-		Doc:      "useq checks for preferring %q over %s as formatting argument when quotation is needed.",
-		Requires: []*analysis.Analyzer{inspect.Analyzer},
-		Run:      u.run,
-	}
-	return u
+	return u.Analyzer, nil
 }
 
 // Settings holds all the settings for the UseqAnalyzer.
@@ -63,7 +52,7 @@ type Settings struct {
 	// The functions are fully qualified function names including the package (e.g. fmt.Printf).
 	Functions []string `json:"functions"`
 	// FunctionsPerPackage is a map of package names to the functions that should be checked.
-	FunctionsPerPackage map[string][]string
+	FunctionsPerPackage functionsPerPackage
 }
 
 // UseqAnalyzer is the main struct for the linter plugin.
@@ -74,21 +63,38 @@ type UseqAnalyzer struct {
 
 // Compile will compile the settings for the analyzer.
 func (u *UseqAnalyzer) Compile() error {
-	u.settings.FunctionsPerPackage = defaultFunctionsPerPackage
-	for _, fn := range u.settings.Functions {
-		lastDotIndex := strings.LastIndex(fn, ".")
-		if lastDotIndex == -1 {
-			return fmt.Errorf("invalid function name: %s", fn)
-		}
-		parts := []string{fn[:lastDotIndex], fn[lastDotIndex+1:]}
-		if !slices.Contains(u.settings.FunctionsPerPackage[parts[0]], parts[1]) {
-			u.settings.FunctionsPerPackage[parts[0]] = append(u.settings.FunctionsPerPackage[parts[0]], parts[1])
-		}
+	compiledFunctions, err := u.compileSettings(u.settings)
+	if err != nil {
+		return err
 	}
+	u.settings.FunctionsPerPackage = compiledFunctions
 	return nil
 }
 
-func (u *UseqAnalyzer) run(pass *analysis.Pass) (interface{}, error) {
+func (u *UseqAnalyzer) runAnalyzer(pass *analysis.Pass) (interface{}, error) {
+	return run(pass, u.settings.FunctionsPerPackage)
+}
+
+func (u *UseqAnalyzer) compileSettings(settings Settings) (functionsPerPackage, error) {
+	funcs := make(functionsPerPackage)
+	for k, v := range defaultFunctionsPerPackage {
+		funcs[k] = slices.Clone(v)
+	}
+
+	for _, fn := range settings.Functions {
+		lastDotIndex := strings.LastIndex(fn, ".")
+		if lastDotIndex == -1 {
+			return nil, fmt.Errorf("invalid function name: %s", fn)
+		}
+		parts := []string{fn[:lastDotIndex], fn[lastDotIndex+1:]}
+		if !slices.Contains(funcs[parts[0]], parts[1]) {
+			funcs[parts[0]] = append(funcs[parts[0]], parts[1])
+		}
+	}
+	return funcs, nil
+}
+
+func run(pass *analysis.Pass, funcs functionsPerPackage) (interface{}, error) {
 	result := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 
 	nodeFilter := []ast.Node{
@@ -96,13 +102,13 @@ func (u *UseqAnalyzer) run(pass *analysis.Pass) (interface{}, error) {
 	}
 
 	preOrderFiltered(result, ast.IsGenerated, nodeFilter, func(n ast.Node) {
-		u.checkCall(pass, n.(*ast.CallExpr))
+		checkCall(pass, n.(*ast.CallExpr), funcs)
 	})
 
 	return nil, nil
 }
 
-func (u *UseqAnalyzer) checkCall(pass *analysis.Pass, call *ast.CallExpr) {
+func checkCall(pass *analysis.Pass, call *ast.CallExpr, funcs functionsPerPackage) {
 	fn := astutil.Unparen(call.Fun)
 
 	// Ignore type conversions and builtins.
@@ -115,19 +121,19 @@ func (u *UseqAnalyzer) checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 		return
 	}
 
-	if u.isWrongFormattingCall(namedFn, call) {
+	if isWrongFormattingCall(namedFn, call, funcs) {
 		pass.Reportf(call.Fun.Pos(), "use %%q instead of \"%%s\" for formatting strings with quotations")
 	}
 }
 
-func (u *UseqAnalyzer) isWrongFormattingCall(fn *types.Func, call *ast.CallExpr) bool {
+func isWrongFormattingCall(fn *types.Func, call *ast.CallExpr, funcs functionsPerPackage) bool {
 	sig := fn.Type().(*types.Signature)
 
 	// Check if the function signature is variadic and has the correct number of arguments (i.e. we have a formatting signature).
 	if sig == nil || !sig.Variadic() || sig.Params().Len() < 2 {
 		return false
 	}
-	methodsToVerify := u.settings.FunctionsPerPackage[fn.Pkg().Path()]
+	methodsToVerify := funcs[fn.Pkg().Path()]
 	if methodsToVerify == nil {
 		return false
 	}
