@@ -4,6 +4,7 @@
 
 ## Using it with `golangci-lint`
 
+_Note: [v1.1.0](https://github.com/dhaus67/useq/releases/tag/v1.1.0) can be used as module plugin, later version will be added as public linters in `golangci-lint`._
 `useq` can be used with `golangci-lint` with the [module plugin system](https://golangci-lint.run/plugins/module-plugins).
 
 Here's the `.custom-gcl.yml`:

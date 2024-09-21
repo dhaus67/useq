@@ -14,10 +14,5 @@ func TestAnalyzer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	analyzers, err := analyzer.BuildAnalyzers()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	analysistest.Run(t, testdata, analyzers[0], "test")
+	analysistest.Run(t, testdata, analyzer.Analyzer(), "test")
 }

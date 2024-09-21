@@ -15,11 +15,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	analyzers, err := useqAnalyzer.BuildAnalyzers()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	singlechecker.Main(analyzers[0])
+	singlechecker.Main(useqAnalyzer.Analyzer())
 }

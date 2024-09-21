@@ -8,15 +8,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/golangci/plugin-module-register/register"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
 )
-
-var _ register.LinterPlugin = (*UseqAnalyzer)(nil)
 
 var (
 	defaultFunctionsPerPackage = map[string][]string{
@@ -33,53 +30,58 @@ var (
 	}
 )
 
-func init() {
-	register.Plugin("useq", New)
-}
-
-func New(settings any) (register.LinterPlugin, error) {
-	s, err := register.DecodeSettings[Settings](settings)
-	if err != nil {
+// New will create a new instance of the UseqAnalyzer.
+func New(settings Settings) (*UseqAnalyzer, error) {
+	u := &UseqAnalyzer{settings: settings}
+	if err := u.Compile(); err != nil {
 		return nil, err
 	}
-
-	s.FunctionsPerPackage = defaultFunctionsPerPackage
-
-	for _, fn := range s.Functions {
-		lastDotIndex := strings.LastIndex(fn, ".")
-		if lastDotIndex == -1 {
-			return nil, fmt.Errorf("invalid function name: %s", fn)
-		}
-		parts := []string{fn[:lastDotIndex], fn[lastDotIndex+1:]}
-		if !slices.Contains(s.FunctionsPerPackage[parts[0]], parts[1]) {
-			s.FunctionsPerPackage[parts[0]] = append(s.FunctionsPerPackage[parts[0]], parts[1])
-		}
-	}
-
-	return &UseqAnalyzer{settings: s}, nil
+	return u, nil
 }
 
+// NewWithoutCompile will create a new instance of the UseqAnalyzer without compiling the settings.
+// Note: the settings should be compiled before running the linter plugin.
+func NewWithoutCompile(settings Settings) *UseqAnalyzer {
+	return &UseqAnalyzer{settings: settings}
+}
+
+// Settings holds all the settings for the UseqAnalyzer.
 type Settings struct {
 	// The functions are fully qualified function names including the package (e.g. fmt.Printf).
-	Functions           []string `json:"functions"`
+	Functions []string `json:"functions"`
+	// FunctionsPerPackage is a map of package names to the functions that should be checked.
 	FunctionsPerPackage map[string][]string
 }
 
+// UseqAnalyzer is the main struct for the linter plugin.
 type UseqAnalyzer struct {
 	settings Settings
 }
 
-func (u *UseqAnalyzer) BuildAnalyzers() ([]*analysis.Analyzer, error) {
-	return []*analysis.Analyzer{{
+// Compile will compile the settings for the analyzer.
+func (u *UseqAnalyzer) Compile() error {
+	u.settings.FunctionsPerPackage = defaultFunctionsPerPackage
+	for _, fn := range u.settings.Functions {
+		lastDotIndex := strings.LastIndex(fn, ".")
+		if lastDotIndex == -1 {
+			return fmt.Errorf("invalid function name: %s", fn)
+		}
+		parts := []string{fn[:lastDotIndex], fn[lastDotIndex+1:]}
+		if !slices.Contains(u.settings.FunctionsPerPackage[parts[0]], parts[1]) {
+			u.settings.FunctionsPerPackage[parts[0]] = append(u.settings.FunctionsPerPackage[parts[0]], parts[1])
+		}
+	}
+	return nil
+}
+
+// Analyzer returns the analyis.Analyzer that will be run.
+func (u *UseqAnalyzer) Analyzer() *analysis.Analyzer {
+	return &analysis.Analyzer{
 		Name:     "useq",
 		Doc:      "useq checks for preferring %q over %s as formatting argument when quotation is needed.",
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 		Run:      u.run,
-	}}, nil
-}
-
-func (u *UseqAnalyzer) GetLoadMode() string {
-	return register.LoadModeSyntax
+	}
 }
 
 func (u *UseqAnalyzer) run(pass *analysis.Pass) (interface{}, error) {
