@@ -33,6 +33,12 @@ var (
 // New will create a new instance of the UseqAnalyzer.
 func New(settings Settings) (*UseqAnalyzer, error) {
 	u := &UseqAnalyzer{settings: settings}
+	u.Analyzer = &analysis.Analyzer{
+		Name:     "useq",
+		Doc:      "useq checks for preferring %q over %s as formatting argument when quotation is needed.",
+		Requires: []*analysis.Analyzer{inspect.Analyzer},
+		Run:      u.run,
+	}
 	if err := u.Compile(); err != nil {
 		return nil, err
 	}
@@ -42,7 +48,14 @@ func New(settings Settings) (*UseqAnalyzer, error) {
 // NewWithoutCompile will create a new instance of the UseqAnalyzer without compiling the settings.
 // Note: the settings should be compiled before running the linter plugin.
 func NewWithoutCompile(settings Settings) *UseqAnalyzer {
-	return &UseqAnalyzer{settings: settings}
+	u := &UseqAnalyzer{settings: settings}
+	u.Analyzer = &analysis.Analyzer{
+		Name:     "useq",
+		Doc:      "useq checks for preferring %q over %s as formatting argument when quotation is needed.",
+		Requires: []*analysis.Analyzer{inspect.Analyzer},
+		Run:      u.run,
+	}
+	return u
 }
 
 // Settings holds all the settings for the UseqAnalyzer.
@@ -56,6 +69,7 @@ type Settings struct {
 // UseqAnalyzer is the main struct for the linter plugin.
 type UseqAnalyzer struct {
 	settings Settings
+	Analyzer *analysis.Analyzer
 }
 
 // Compile will compile the settings for the analyzer.
@@ -72,16 +86,6 @@ func (u *UseqAnalyzer) Compile() error {
 		}
 	}
 	return nil
-}
-
-// Analyzer returns the analyis.Analyzer that will be run.
-func (u *UseqAnalyzer) Analyzer() *analysis.Analyzer {
-	return &analysis.Analyzer{
-		Name:     "useq",
-		Doc:      "useq checks for preferring %q over %s as formatting argument when quotation is needed.",
-		Requires: []*analysis.Analyzer{inspect.Analyzer},
-		Run:      u.run,
-	}
 }
 
 func (u *UseqAnalyzer) run(pass *analysis.Pass) (interface{}, error) {

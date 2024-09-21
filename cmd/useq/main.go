@@ -15,5 +15,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	singlechecker.Main(useqAnalyzer.Analyzer())
+	singlechecker.Main(useqAnalyzer.Analyzer)
 }

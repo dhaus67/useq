@@ -14,5 +14,5 @@ func TestAnalyzer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	analysistest.Run(t, testdata, analyzer.Analyzer(), "test")
+	analysistest.Run(t, testdata, analyzer.Analyzer, "test")
 }
