@@ -8,11 +8,11 @@
 
 Here's the `.custom-gcl.yml`:
 ```yaml
-version: v1.63.0
+version: v1.60.1
 plugins:
   - module: 'github.com/dhaus67/useq'
-    import: 'github.com/dhaus67/useq/useq'
-    version: v1.0.0
+    import: 'github.com/dhaus67/useq'
+    version: latest
 ```
 
 Here's a configuration of `useq` in `.golangci.yml`:
@@ -23,12 +23,12 @@ linters-settings:
       type: "module"
       description: "Detects usages of `\"%s\"` in `fmt.Sprintf` calls and suggests using `%q` instead."
       settings:
-        validate:
-          # A list of packages and functions which accept string formatting to validate.
+        functions:
+          # A list of functions to validate. The function name needs to be the full qualified name (including potential pointers).
           # By default, `useq` validates fmt and github.com/pkg/errors functions.
-          "github.com/custom/package":
-            - "MyPrintf"
-
+          #- github.com/custom/package.MyPrintf              # exported package level function.
+          #- (github.com/custom/package.MyStruct).MyPrintf   # exported method of a struct.
+          #- (*github.com/custom/package.MyStruct).MyPrintf  # exported method of a struct with a pointer receiver.
 linters:
   disable-all: true
   enable:

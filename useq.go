@@ -19,7 +19,7 @@ import (
 var _ register.LinterPlugin = (*UseqAnalyzer)(nil)
 
 var (
-	DefaultValidationSettings = map[string][]string{
+	defaultFunctionsPerPackage = map[string][]string{
 		"fmt": {
 			"Printf",
 			"Sprintf",
@@ -43,15 +43,26 @@ func New(settings any) (register.LinterPlugin, error) {
 		return nil, err
 	}
 
-	for pkg, funcs := range DefaultValidationSettings {
-		s.Validate[pkg] = funcs
+	s.FunctionsPerPackage = defaultFunctionsPerPackage
+
+	for _, fn := range s.Functions {
+		lastDotIndex := strings.LastIndex(fn, ".")
+		if lastDotIndex == -1 {
+			return nil, fmt.Errorf("invalid function name: %s", fn)
+		}
+		parts := []string{fn[:lastDotIndex], fn[lastDotIndex+1:]}
+		if !slices.Contains(s.FunctionsPerPackage[parts[0]], parts[1]) {
+			s.FunctionsPerPackage[parts[0]] = append(s.FunctionsPerPackage[parts[0]], parts[1])
+		}
 	}
 
 	return &UseqAnalyzer{settings: s}, nil
 }
 
 type Settings struct {
-	Validate map[string][]string `json:"validate"`
+	// The functions are fully qualified function names including the package (e.g. fmt.Printf).
+	Functions           []string `json:"functions"`
+	FunctionsPerPackage map[string][]string
 }
 
 type UseqAnalyzer struct {
@@ -110,7 +121,7 @@ func (u *UseqAnalyzer) isWrongFormattingCall(fn *types.Func, call *ast.CallExpr)
 	if sig == nil || !sig.Variadic() || sig.Params().Len() < 2 {
 		return false
 	}
-	methodsToVerify := u.settings.Validate[fn.Pkg().Path()]
+	methodsToVerify := u.settings.FunctionsPerPackage[fn.Pkg().Path()]
 	if methodsToVerify == nil {
 		return false
 	}

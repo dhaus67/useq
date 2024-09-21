@@ -9,7 +9,7 @@ import (
 func TestAnalyzer(t *testing.T) {
 	testdata := analysistest.TestData()
 
-	analyzer, err := New(Settings{Validate: DefaultValidationSettings})
+	analyzer, err := New(Settings{})
 	if err != nil {
 		t.Fatal(err)
 	}

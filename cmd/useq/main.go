@@ -9,11 +9,7 @@ import (
 )
 
 func main() {
-	settings := useq.Settings{
-		Validate: useq.DefaultValidationSettings,
-	}
-
-	useqAnalyzer, err := useq.New(settings)
+	useqAnalyzer, err := useq.New(useq.Settings{})
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
