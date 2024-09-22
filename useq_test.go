@@ -9,10 +9,12 @@ import (
 func TestAnalyzer(t *testing.T) {
 	testdata := analysistest.TestData()
 
-	analyzer, err := NewAnalyzer(Settings{})
+	analyzer, err := NewAnalyzer(Settings{
+		Functions: []string{"test.myCustomPrint"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	analysistest.Run(t, testdata, analyzer, "test")
+	analysistest.RunWithSuggestedFixes(t, testdata, analyzer, "test")
 }

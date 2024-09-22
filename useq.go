@@ -121,37 +121,57 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr, funcs functionsPerPackag
 		return
 	}
 
-	if isWrongFormattingCall(namedFn, call, funcs) {
-		pass.Reportf(call.Fun.Pos(), "use %%q instead of \"%%s\" for formatting strings with quotations")
+	if wrong, fix := isWrongFormattingCall(namedFn, call, funcs); wrong {
+		pass.Report(analysis.Diagnostic{
+			Pos:            call.Fun.Pos(),
+			End:            call.Fun.End(),
+			Message:        "use %q instead of \"%s\" for formatting strings with quotations",
+			SuggestedFixes: []analysis.SuggestedFix{fix},
+		})
 	}
 }
 
-func isWrongFormattingCall(fn *types.Func, call *ast.CallExpr, funcs functionsPerPackage) bool {
+func isWrongFormattingCall(fn *types.Func, call *ast.CallExpr, funcs functionsPerPackage) (bool, analysis.SuggestedFix) {
 	sig := fn.Type().(*types.Signature)
 
 	// Check if the function signature is variadic and has the correct number of arguments (i.e. we have a formatting signature).
 	if sig == nil || !sig.Variadic() || sig.Params().Len() < 2 {
-		return false
+		return false, analysis.SuggestedFix{}
 	}
 	methodsToVerify := funcs[fn.Pkg().Path()]
 	if methodsToVerify == nil {
-		return false
+		return false, analysis.SuggestedFix{}
 	}
 
 	name := getFunctionName(fn, sig)
 	if !slices.Contains(methodsToVerify, name) {
-		return false
+		return false, analysis.SuggestedFix{}
 	}
 
 	// In fmt style APIs, the last argument will be the variadic argument, and the second to last argument will be the format string.
 	formatIndex := sig.Params().Len() - 2
 	formatArg, ok := call.Args[formatIndex].(*ast.BasicLit)
 	if !ok || formatArg.Kind != token.STRING {
-		return false
+		return false, analysis.SuggestedFix{}
 	}
 
 	formatStr := strings.Trim(formatArg.Value, "\"")
-	return strings.Contains(formatStr, `\"%s\"`)
+	needsFix := strings.Contains(formatStr, `\"%s\"`)
+	if !needsFix {
+		return false, analysis.SuggestedFix{}
+	}
+
+	newFormatArgStr := strings.ReplaceAll(formatArg.Value, `\"%s\"`, `%q`)
+	return true, analysis.SuggestedFix{
+		Message: "replace \"%s\" with %q for formatting strings with quotations",
+		TextEdits: []analysis.TextEdit{
+			{
+				Pos:     formatArg.Pos(),
+				End:     formatArg.End(),
+				NewText: []byte(newFormatArgStr),
+			},
+		},
+	}
 }
 
 // preOrderFiltered calls inspector.Preorder but filters out files that do not pass the filter function.
