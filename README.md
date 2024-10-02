@@ -1,6 +1,6 @@
 # useq
 
-`useq` is a custom [Go analyzer](https://pkg.go.dev/golang.org/x/tools/go/analysis#hdr-Analyzer) that detects usages of `\"%s\"` in `fmt.Sprintf` calls and suggests using `%q` instead.
+`useq` is a custom [Go analyzer](https://pkg.go.dev/golang.org/x/tools/go/analysis#hdr-Analyzer) that detects usages of `\"%s\"` in formatting arguments and suggests using `%q` instead.
 
 ## Using it with `golangci-lint`
 
