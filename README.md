@@ -44,5 +44,18 @@ linters:
 go install github.com/dhaus67/useq/cmd/useq@latest
 ```
 
-Currently, the standalone function does not support reading in a configuration file. It will only validate `fmt.Sprintf` and `github.com/pkg/errors` functions.
-If you want more customizations, you can use `useq` with `golangci-lint` as described above.
+You can define a config file with your custom functions you want to validate as well:
+```json
+{
+  "functions": [
+    "github.com/custom/package.MyPrintf",              # exported package level function.
+    "(github.com/custom/package.MyStruct).MyPrintf",   # exported method of a struct.
+    "(*github.com/custom/package.MyStruct).MyPrintf"   # exported method of a struct with a pointer receiver.
+  ]
+}
+```
+
+And pass it as a flag to the linter:
+```sh
+useq -config=path/to/config/file
+```
